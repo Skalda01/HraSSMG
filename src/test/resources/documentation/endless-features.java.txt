@@ -1,0 +1,194 @@
+// Executed unchanged by DocumentationRuntimeChecks through the real game editor.
+package sklad.overeni;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import static robot.api.Robot.*;
+
+public class Main {
+    public static int verejna = 10;
+    private static int soukroma = 20;
+    protected static int chranena = 30;
+    static int balickova = 40;
+
+    public static void main(String[] args) {
+        datoveTypy(); podminky(); cykly(); prepinaceASkoky(); pole(); seznamy(); pristup(); algoritmy(); robot();
+    }
+
+    // 02: all eight primitives, literals, casts, arithmetic, arrays and default values.
+    private static void datoveTypy() {
+        byte b = 12; short s = 2000; int i = 100000; long l = 3000000000L;
+        float f = 1.5f; double d = 12.75; char c = 'A'; boolean flag = true;
+        String text = "Robot " + c;
+        byte[] bs = {b}; short[] ss = {s}; int[] is = {i}; long[] ls = {l};
+        float[] fs = {f}; double[] ds = {d}; char[] cs = {c}; boolean[] flags = {flag};
+        bs[0]++; ss[0] += 2; is[0] += 3; ls[0] += 4;
+        fs[0] *= 2; ds[0] /= 2; cs[0]++; flags[0] = !flags[0];
+        require(bs[0] == 13 && ss[0] == 2002 && is[0] == 100003 && ls[0] == 3000000004L, "integer types");
+        require(fs[0] == 3 && ds[0] == 6.375 && cs[0] == 'B' && !flags[0] && text.equals("Robot A"), "other types");
+        require(7 / 2 == 3 && 7 % 2 == 1 && (int) 3.9 == 3 && 2+3*4 == 14, "arithmetic");
+        require(new int[2][3][0].length == 2 && !(new boolean[1])[0] && (new char[1])[0]=='\0'
+                && (new String[1])[0]==null, "defaults");
+    }
+
+    // 03: every comparison, short-circuit logical expressions, nested and independent branches.
+    static void podminky() {
+        int x = 2; boolean ok = x > 0 && x >= 2 && x < 3 && x <= 2 && x == 2 && x != 3;
+        if (ok) { if (!(x == 3) && (x == 2 || 1/0 == 0)) x++; }
+        else if (x < 0) x = 0;
+        else x = -1;
+        int result;
+        if (x == 0) result = 0; else if (x == 3) result = 3; else result = -1;
+        if (x > 0) result++;
+        if (x < 4) result++;
+        require(result == 5 && (true || 1/0 == 0) && !(false && 1/0 == 0), "branches and short circuit");
+    }
+
+    // 04/05: for, while, do-while, for-each, nested loops, labels, break, continue, return.
+    private static void cykly() {
+        int sum = 0;
+        for (int i=0; i<5; i++) { if (i==1) continue; if (i==4) break; sum+=i; }
+        int count = 0; while (count<3) count++;
+        do { count++; } while (count<5);
+        do { count++; } while (false);
+        for (int value : new int[]{1,2,3}) sum+=value;
+        require(sum == 11 && count == 6, "loop variants");
+        int visits = 0;
+        outer: for (int i=0;i<3;i++) for (int j=0;j<3;j++) { if (j==1) continue outer; visits++; }
+        stop: while (true) { for (int i=0;i<3;i++) { visits++; break stop; } }
+        require(visits == 4 && secti(2,3) == 5 && prvni(new int[]{-2,0,7,8}) == 7, "labels and return");
+    }
+    public static int secti(int a, int b) { return a+b; }
+    protected static int prvni(int[] values) { for(int x:values) if(x>0) return x; return -1; }
+
+    static void prepinaceASkoky() {
+        int n = 0;
+        switch (2) { case 1: n=1; break; case 2: n=2; default: n+=10; }
+        require(n == 12, "classic switch fallthrough");
+        switch ("text") { case "text": n++; break; default: n=0; }
+        switch (Direction.RIGHT) { case RIGHT -> n++; default -> n=0; }
+        int value = switch (n) { case 13,14 -> { int a=20; yield a+2; } default -> -1; };
+        require(value == 22, "switch expressions, multiple labels, yield");
+        int sum=0;
+        for(int i=0;i<4;i++) { switch(i) { case 1: continue; case 2: break; default: sum++; } sum++; }
+        require(sum == 5, "switch break versus loop continue");
+    }
+
+    private static void pole() {
+        int[] a; a = new int[]{10,20,30}; a[1]=50;
+        int[] alias=a; alias[0]++;
+        int[] copy=a.clone(); copy[0]=0;
+        require(a.length==3 && a[a.length-1]==30 && a[0]==11 && copy[0]==0, "array aliases and clone");
+        int[][] mapa = {{1,2,3},{4},{5,6}};
+        mapa[1][0]=40; int sum=0;
+        for(int y=0;y<mapa.length;y++) for(int x=0;x<mapa[y].length;x++) sum+=mapa[y][x];
+        int sum2=0; for(int[] row:mapa) for(int x:row) sum2+=x;
+        require(sum==57 && sum2==sum && mapa[1].length==1, "ragged 2D and both nested loop forms");
+        int[][] empty=new int[3][]; empty[0]=new int[2]; empty[1]=new int[]{7}; empty[2]=new int[0];
+        require(empty[0][0]==0 && empty[1][0]==7 && empty[2].length==0, "2D construction");
+        int[][] shallow=mapa.clone(); shallow[0][0]=9;
+        require(mapa[0][0]==9 && shallow!=mapa && shallow[0]==mapa[0], "2D shallow copy");
+        boolean caught=false; try { int invalid=a[a.length]; } catch(ArrayIndexOutOfBoundsException e) { caught=true; }
+        require(caught, "invalid array index");
+    }
+
+    // 07 also executes every literal code example separately in the other player program.
+    private static void seznamy() {
+        ArrayList<Integer> numbers=new ArrayList<>(); numbers.add(30); numbers.add(10); numbers.add(1,20);
+        numbers.set(0,5); require(numbers.get(0)==5 && numbers.size()==3, "add/get/set");
+        numbers.add(20); require(numbers.contains(20) && numbers.indexOf(20)==1 && numbers.lastIndexOf(20)==3, "lookup");
+        numbers.remove(Integer.valueOf(20)); numbers.remove(0);
+        numbers.addAll(List.of(5,4,3,2,1)); numbers.removeIf(x -> x%2==0);
+        numbers.sort(null); require(numbers.equals(List.of(1,3,5)), "lambda removal and sort");
+        numbers.sort(Comparator.reverseOrder()); require(numbers.equals(List.of(5,3,1)), "custom comparator");
+        ArrayList<Integer> alias=numbers, copy=new ArrayList<>(numbers); alias.add(9);
+        require(alias==numbers && copy.size()==3 && numbers.size()==4, "list identity and copy");
+        ArrayList<ArrayList<Integer>> groups=new ArrayList<>(); groups.add(numbers); groups.add(copy);
+        int sum=0; for(var group:groups) for(int value:group) sum+=value;
+        require(sum==27 && groups.get(0).get(3)==9, "nested lists");
+        ArrayList<int[]> objects=new ArrayList<>(); objects.add(new int[]{1,2});
+        ArrayList<int[]> shallow=new ArrayList<>(objects); shallow.get(0)[0]=8;
+        require(objects.get(0)[0]==8, "shallow object list copy");
+        ArrayList<Double> doubles=new ArrayList<>(); doubles.add(1.5);
+        ArrayList<Boolean> bools=new ArrayList<>(); bools.add(true);
+        ArrayList<Character> chars=new ArrayList<>(); chars.add('A');
+        ArrayList<String> texts=new ArrayList<>(); texts.add("text");
+        require(doubles.get(0)==1.5 && bools.get(0) && chars.get(0)=='A' && texts.get(0).equals("text"), "wrappers/boxing");
+        boolean caught=false; try { numbers.get(99); } catch(IndexOutOfBoundsException e) { caught=true; }
+        require(caught, "invalid list index");
+        caught=false;
+        try { for(Integer value:numbers) numbers.add(100); } catch(java.util.ConcurrentModificationException e) { caught=true; }
+        require(caught, "concurrent modification");
+        numbers.clear(); require(numbers.isEmpty() && numbers.toArray().length==0, "clear and empty list");
+    }
+
+    private static void pristup() {
+        require(verejna+soukroma==30, "fields");
+        RobotStav stav=new RobotStav(100); stav.setEnergie(-1); require(stav.getEnergie()==100,"encapsulation");
+        stav.setEnergie(90); require(stav.getEnergie()==90,"setter");
+        Pomocnik p=new Pomocnik(); p.zvys(); require(p.hodnota==11 && p.chranenaHodnota()==30,"package/protected");
+        require(Soukromy.vytvor().value==7 && new ChranenyPotomek().value==8,"constructors and nested class");
+    }
+    private static class Soukromy {
+        private int value=7; private Soukromy() {} public static Soukromy vytvor() { return new Soukromy(); }
+    }
+
+    private static void algoritmy() {
+        int[] a={8,3,5,1,4};
+        for(int end=a.length-1;end>0;end--) for(int i=0;i<end;i++) if(compare(a,i,i+1)>0) swap(a,i,i+1);
+        require(Arrays.equals(a,new int[]{1,3,4,5,8}),"bubble sort");
+        require(hledej(a,5)==3 && hledej(a,6)==-1,"binary search found and absent");
+    }
+    private static int compare(int[] a,int i,int j) { return Integer.compare(a[i],a[j]); }
+    private static void swap(int[] a,int i,int j) { int temp=a[i]; a[i]=a[j]; a[j]=temp; }
+    private static int hledej(int[] a,int cil) {
+        int leva=0,prava=a.length-1;
+        while(leva<=prava) { int stred=leva+(prava-leva)/2; if(a[stred]==cil) return stred;
+            if(a[stred]<cil) leva=stred+1; else prava=stred-1; }
+        return -1;
+    }
+
+    private static void robot() {
+        require(robotCoordinatesX()==0 && robotCoordinatesY()==0 && tileType()==TileType.FLOOR,"start queries");
+        ArrayList<Direction> route=new ArrayList<>(List.of(Direction.RIGHT,Direction.RIGHT,Direction.DOWN,Direction.LEFT));
+        ArrayList<Integer> xs=new ArrayList<>(), ys=new ArrayList<>();
+        xs.add(robotCoordinatesX()); ys.add(robotCoordinatesY());
+        for(Direction direction:route) { move(direction); xs.add(robotCoordinatesX()); ys.add(robotCoordinatesY()); }
+        require(xs.equals(List.of(0,1,2,2,1)) && ys.equals(List.of(0,0,0,1,1)),"route coordinate history");
+        int[][] mapa=new int[20][20]; mapa[robotCoordinatesY()][robotCoordinatesX()]=1;
+        require(mapa[1][1]==1,"map[y][x]");
+        presunNa(1,0); require(tileType()==TileType.INBOUND && shelfType()==null && cargoType()==null,"inbound");
+        pick(); require(cargoType()==ShelfType.PARTS,"pick");
+        presunNa(1,19); require(tileType()==TileType.SHELF && shelfType()==ShelfType.PARTS,"shelf");
+        drop(); require(cargoType()==null,"store"); pick();
+        int remaining=orderRemaining(ShelfType.PARTS);
+        presunNa(0,1); require(tileType()==TileType.DOCK,"dock"); drop();
+        require(orderRemaining(ShelfType.PARTS)==remaining-1 && cargoType()==null,"delivery");
+        switch(cargoType()) { case null -> {} default -> throw new AssertionError("nullable switch"); }
+    }
+    private static void presunNa(int x, int y) {
+        int aktualniX = robotCoordinatesX();
+        int aktualniY = robotCoordinatesY();
+        while (aktualniX < x) { move(Direction.RIGHT); aktualniX++; }
+        while (aktualniX > x) { move(Direction.LEFT); aktualniX--; }
+        while (aktualniY < y) { move(Direction.DOWN); aktualniY++; }
+        while (aktualniY > y) { move(Direction.TOP); aktualniY--; }
+    }
+    private static void require(boolean ok,String feature) { if(!ok) throw new AssertionError(feature); }
+}
+
+class RobotStav {
+    private int energie;
+    public RobotStav(int energie) { this.energie=energie; }
+    public int getEnergie() { return energie; }
+    public void setEnergie(int value) { if(value>=0) energie=value; }
+}
+class Zaklad { protected int value; protected Zaklad(int value) { this.value=value; } }
+class ChranenyPotomek extends Zaklad { ChranenyPotomek() { super(8); } }
+class Pomocnik {
+    int hodnota=10;
+    void zvys() { hodnota++; }
+    int chranenaHodnota() { return Main.chranena; }
+}
