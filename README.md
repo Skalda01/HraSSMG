@@ -1,15 +1,30 @@
 # WORKER // OS
 
-Programovací hra v Javě 21 a LWJGL / OpenGL 3.3 inspirovaná přiloženým návrhem.
+Programovací hra v Javě 21 se Swing/Java2D a volitelným LWJGL / OpenGL 3.3.
 Robot ve skladu doručuje součástky a elektroniku podle programu napsaného v editoru.
 
 ## Spuštění
 
-V IntelliJ načti Maven projekt, nastav **JDK 21 nebo novější** a spusť `org.example.Main`.
-Je potřeba plné JDK včetně `javac`, protože hra překládá hráčův kód.
-Projekt používá nativní knihovny pro Windows x64.
+Po `git clone` na Windows spusť **`spustit.cmd`**. Přeloží zdroje a otevře hru.
+Použije přibalené Java knihovny z `lib/`, takže nepotřebuje Maven, internet,
+instalaci závislostí ani rozbalování DLL. Aktualizace zdrojů se při dalším spuštění přeloží znovu.
+
+Je potřeba již nainstalované a školou povolené **JDK 21 nebo novější** včetně `javac`,
+protože hra překládá hráčův kód. Nastav `JAVA_HOME` na JDK nebo měj `java` a `javac` na PATH.
+V IntelliJ stačí načíst Maven projekt, nastavit stejné JDK a spustit `org.example.Main`.
+Výchozí renderer používá pouze Swing/Java2D z JDK, bez načítání `lwjgl.dll`, GLFW a STB.
+Přibalený font, úrovně, editor, krokování i kompilace studentského programu zůstávají dostupné.
+
+Hra vyžaduje zápis do klonu (`target/`, uložená řešení) a do dočasné složky pro
+zdroje a `.class` studentských programů. Ty spouští pomocí `java.exe` ze stejného
+povoleného JDK; žádný další EXE neinstaluje ani nerozbaluje. Jestli školní pravidla
+zakazují i tento způsob spuštění Javy, samotný projekt povolení nahradit nemůže.
 
 S Mavenem na PATH: `mvn compile exec:java`.
+
+Původní OpenGL renderer je volitelný: v IntelliJ přidej VM parametr
+`-Dhrassmg.renderer=opengl`. Tento režim používá Maven nativní závislosti Windows x64
+a potřebuje povolené načítání DLL. Pro školní počítače ponech výchozí Java2D režim.
 
 ## První směna
 

@@ -82,6 +82,7 @@ public class Game {
     private long currentMonitor;
     private boolean monitorGeometryChanged, monitorScaleChanged, repaint = true;
     private long cursorPhase = -1;
+    private SwingWindow desktop;
 
     public Game() { this(Path.of("levels"), Path.of("programs"), Path.of("robot-program.java.txt")); }
     Game(Path levelDirectory, Path programDirectory, Path legacyProgram) {
@@ -92,6 +93,19 @@ public class Game {
     }
 
     public void run() {
+        if (!"opengl".equalsIgnoreCase(System.getProperty("hrassmg.renderer", "java2d"))) {
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                desktop = new SwingWindow(this);
+                load();
+                previousFrame = time();
+                desktop.open();
+            });
+            return;
+        }
+        runOpenGL();
+    }
+
+    private void runOpenGL() {
         GLFWErrorCallback errors = GLFWErrorCallback.createPrint(System.err);
         errors.set();
         try {
@@ -220,7 +234,7 @@ public class Game {
         if (visible) glfwShowWindow(window);
     }
 
-    private boolean editable() { return editor.focused && !levelMenu && !running && pending == null && tab == EditorTab.JAVA && (!layout.compact || editorView); }
+    boolean editable() { return editor.focused && !levelMenu && !running && pending == null && tab == EditorTab.JAVA && (!layout.compact || editorView); }
 
     /** GLFW předává fyzické klávesy; zkratky Z/Y se řídí aktuálním rozložením. */
     static int shortcutKey(int physicalKey, int mods, String name) {
@@ -230,7 +244,7 @@ public class Game {
         return physicalKey;
     }
 
-    private void key(int key, int mods) {
+    void key(int key, int mods) {
         repaint = true;
         boolean ctrl = (mods & GLFW_MOD_CONTROL) != 0 && (mods & GLFW_MOD_ALT) == 0, shift = (mods & GLFW_MOD_SHIFT) != 0;
         if (documentationChapter != null && !levelMenu && (!layout.compact || !editorView)) {
@@ -303,9 +317,9 @@ public class Game {
                 case GLFW_KEY_A -> { editor.anchor = 0; editor.caret = editor.text.length(); editor.reveal(); }
                 case GLFW_KEY_Z -> history(shift);
                 case GLFW_KEY_Y -> history(true);
-                case GLFW_KEY_C -> glfwSetClipboardString(window, editor.selection());
-                case GLFW_KEY_X -> { glfwSetClipboardString(window, editor.selection()); editor.insert(""); changed(); }
-                case GLFW_KEY_V -> { String value = glfwGetClipboardString(window); if (value != null) { editor.insert(value); changed(); } }
+                case GLFW_KEY_C -> setClipboard(editor.selection());
+                case GLFW_KEY_X -> { setClipboard(editor.selection()); editor.insert(""); changed(); }
+                case GLFW_KEY_V -> { String value = getClipboard(); if (value != null) { editor.insert(value); changed(); } }
                 case GLFW_KEY_HOME -> editor.move(0, shift);
                 case GLFW_KEY_END -> editor.move(editor.text.length(), shift);
                 default -> { }
@@ -330,6 +344,19 @@ public class Game {
     }
 
     private void changed() { closeSession(); repaint = true; saved = false; commandIndex = 0; activeLine = 0; }
+    void type(String value) {
+        if (!editable()) return;
+        editor.insert(value); changed(); refreshCompletion(false);
+    }
+
+    private void setClipboard(String value) {
+        if (desktop != null) desktop.setClipboard(value);
+        else glfwSetClipboardString(window, value);
+    }
+
+    private String getClipboard() {
+        return desktop != null ? desktop.getClipboard() : glfwGetClipboardString(window);
+    }
     private void history(boolean redo) {
         if (!(redo ? editor.redo() : editor.undo())) return;
         changed();
@@ -469,8 +496,10 @@ public class Game {
         nextStep = 0;
     }
 
-    private void update() {
-        double now = glfwGetTime(), dt = Math.min(0.1, now - previousFrame);
+    private double time() { return desktop != null ? System.nanoTime() / 1_000_000_000.0 : glfwGetTime(); }
+
+    void update() {
+        double now = time(), dt = Math.min(0.1, now - previousFrame);
         previousFrame = now;
         if (world.level.arrayLevel() && sorting.animating() && (running || stepRequested)) {
             sorting.advance(dt, stepInterval());
@@ -777,6 +806,72 @@ public class Game {
         textRenderer.render(width, height);
     }
 
+    void paintJava2D(Graphics2D graphics, int width, int height, double dpi) {
+        UiLayout next = new UiLayout(Math.max(1, (int) Math.round(width * dpi)),
+                Math.max(1, (int) Math.round(height * dpi)), dpi);
+        if (next.pixelWidth != layout.pixelWidth || next.pixelHeight != layout.pixelHeight || next.scale != layout.scale) {
+            completion.close(); repaint = true;
+        }
+        layout = next;
+        editor.visibleRows = layout.visibleRows();
+        if (surface == null || surface.getWidth() != layout.pixelWidth || surface.getHeight() != layout.pixelHeight) {
+            surface = new BufferedImage(layout.pixelWidth, layout.pixelHeight, BufferedImage.TYPE_INT_RGB);
+            repaint = true;
+        }
+        long blink = System.currentTimeMillis() / 500;
+        if (blink != cursorPhase) { repaint = true; cursorPhase = blink; }
+        if (running || Math.abs(robotX - world.x) > 0.001 || Math.abs(robotY - world.y) > 0.001) repaint = true;
+        if (repaint) {
+            Graphics2D image = surface.createGraphics();
+            try { image.scale(layout.scale, layout.scale); dashboard.draw(image, this); }
+            finally { image.dispose(); }
+            repaint = false;
+        }
+        graphics.drawImage(surface, 0, 0, width, height, null);
+    }
+
+    Point2D.Double desktopPointer(double x, double y, int width, int height) {
+        return layout.pointer(x, y, width, height);
+    }
+
+    void drag(Point2D.Double point) {
+        repaint = true;
+        if (draggingSpeed) setSpeedMultiplier(layout.speedAt(point.x));
+        else if (selecting && editable()) {
+            editor.at(editor.scroll + layout.codeRow(point.y), dashboard.codeColumn(point.x, layout, editor), true);
+        }
+    }
+
+    void releasePointer() { selecting = draggingSpeed = false; }
+    void lostFocus() { completion.close(); releasePointer(); repaint = true; }
+
+    void scroll(Point2D.Double point, double dy) {
+        repaint = true;
+        if (dy == 0) return;
+        if (levelMenu) { moveLevelSelection(dy > 0 ? -1 : 1); return; }
+        if (documentationChapter != null && (!layout.compact || !editorView) && layout.documentationWindow.contains(point)) {
+            dashboard.scrollChapter((int) (-dy * 48)); return;
+        }
+        if (completion.isOpen()) {
+            if (dashboard.completionPopup(editor, layout, completion).bounds().contains(point)) {
+                completion.move(dy > 0 ? -1 : 1); return;
+            }
+            completion.close();
+        }
+        if (world.level.arrayPractice() && documentationChapter == null && (!layout.compact || !editorView) && layout.board.contains(point)) {
+            dashboard.scrollArray(dy > 0 ? -1 : 1, sorting, layout); return;
+        }
+        if (tab != EditorTab.JAVA) dashboard.scrollPage((int) (-dy * 48));
+        else editor.scroll = Math.clamp(editor.scroll - (int) (dy * 3), 0, Math.max(0, editor.lines().length - editor.visibleRows));
+    }
+
+    void closeDesktop() {
+        save(); closeSession();
+        if (pending != null) pending.thenAccept(RobotProgram.Session::close);
+        compiler.shutdownNow();
+        textRenderer.close();
+    }
+
     private void refreshLayout() {
         if (monitorGeometryChanged && !fullscreen) fitChangedMonitor();
         int[] width = new int[1], height = new int[1];
@@ -867,6 +962,7 @@ public class Game {
     }
 
     private void toggleFullscreen() {
+        if (desktop != null) { fullscreen = !fullscreen; desktop.fullscreen(fullscreen); return; }
         if (fullscreen) {
             glfwSetWindowMonitor(window, NULL, restoreX, restoreY, restoreWidth, restoreHeight, GLFW_DONT_CARE);
             fullscreen = false;
